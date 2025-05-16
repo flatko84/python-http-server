@@ -1,15 +1,21 @@
 import socket
 from threading import Thread
 
+# could be a dataclass in a real-world app
 class Request:
     def __init__(self, data):
-        parsed_data = data.split("\r\n")
-        print(parsed_data)
-        parsed_head = parsed_data[0].split(" ")
-        self.method = parsed_head[0]
-        self.route = parsed_head[1]
-        self.host = parsed_data[1][6:]
-        self.user_agent = parsed_data[2][12:]
+        self.head, self.body = data.split("\r\n\r\n")
+        head_parsed = self.head.split("\r\n")
+        self.method, self.route, self.protocol = head_parsed[0].split(" ")
+        self.props = {}
+        self.headers = {}
+        if (len(head_parsed)) > 1:
+            for header_row in head_parsed[1:]:
+                header_row_split = header_row.split(": ")
+                self.headers[header_row_split[0]] = header_row_split[1]
+
+    def __repr__(self):
+        return f"(method='{self.method}' route='{self.route}' protocol='{self.protocol}' headers='{"".join([f"{header}: {value}" for header, value in self.headers.items()])}' body='{self.body}')"
 
 class Response:
     def __init__(self, body = '', status = "200 OK"):
@@ -55,9 +61,11 @@ class HttpServer:
                 return False
         return props_dict
     
-    def get_file(self, props):
+    # must be in a separate place for endpoints
+    def get_file(self, request):
         try:
-            with open(f"storage/{props['filename']}") as file:
+            # to do - set this dynamically from the shell script
+            with open(f"storage/{request.props['filename']}") as file:
                 body = file.read()
             response = Response(body=body)
             response.add_header("Content-Type", "application/octet-stream")
@@ -65,26 +73,44 @@ class HttpServer:
         except:
             return Response(status="404 Not Found")
         
-    def router(self, path, request):
+    def create_file(self, request):
+        with open(f"storage/{request.props['filename']}", "w") as file:
+            file.write(request.body)
+        return Response(status="201 Created")
+        
+
+# to do - separate file for the dictionary and anoher one for the routing logic, possibly incorporating the path_match method    
+    def router(self, request):
         routes = {
-            "/echo/(characters)": lambda props: Response(body=props['characters']),
-            "/user-agent": lambda props: Response(body=request.user_agent),
-            "/files/(filename)": self.get_file,
-            "/": lambda props: Response(body="root")
+            "GET": {
+                "/echo/(characters)": lambda request: Response(body=request.props['characters']),
+                "/user-agent": lambda request: Response(body=request.headers['User-Agent']),
+                "/files/(filename)": self.get_file,
+                "/": lambda request: Response(body="root")
+            },
+            "POST": {
+                "/files/(filename)": self.create_file,
+            }
+            
         }
-        for route, endpoint in routes.items():
-            match = self.path_match(path, route)
-            if type(match) == dict:
-                return endpoint(match)
+        # to do - try except
+        for route, endpoint in routes[request.method].items():
+            props = self.path_match(request.route, route)
+            if type(props) == dict:
+                request.props = props
+                return endpoint(request)
         return Response(status="404 Not Found")
 
+# to do - split and eventually decouple web app from server
     def serve(self, socket_object, ret_address):
         with socket_object:
             request_data = socket_object.recv(1024).decode()
             request = Request(request_data)
-            response = self.router(request.route, request)
+            print(request)
+            response = self.router(request)
             socket_object.sendall(response.prepare.encode())
 
+# to do - must be a separate file
     def main(self, *args):
         print("Server started.")
         server = socket.create_server(("localhost", 4221), reuse_port=True)
