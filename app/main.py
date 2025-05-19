@@ -1,5 +1,6 @@
 import socket
 from threading import Thread
+import gzip
 
 # could be a dataclass in a real-world app
 class Request:
@@ -44,7 +45,7 @@ class Response:
 
 
 class HttpServer:
-        
+
     @staticmethod
     def path_match(path, route):
         path_split = path[1:].split("/")
@@ -100,6 +101,20 @@ class HttpServer:
                 request.props = props
                 return endpoint(request)
         return Response(status="404 Not Found")
+    
+    def gzip_compress(self, content):
+        return gzip.compress(content.encode())
+
+    def compress(self, header, content):
+        supported_compressions = {
+            'gzip': self.gzip_compress
+        }
+        compressions = header.split(" ,")
+        for compression in compressions:
+            if compression in supported_compressions.keys():
+                return (compression, supported_compressions[compression](content))
+        return (False, content)
+    
 
 # to do - split and eventually decouple web app from server
     def serve(self, socket_object, ret_address):
@@ -108,6 +123,13 @@ class HttpServer:
             request = Request(request_data)
             print(request)
             response = self.router(request)
+            # to do - implement middleware
+            try:
+                compression_header, request.body = self.compress(request.headers["Accept-Encoding"], request.body)
+                if compression_header:
+                    response.add_header("Content-Encoding", compression_header)
+            except:
+                print("No compression used.")
             socket_object.sendall(response.prepare.encode())
 
 # to do - must be a separate file
