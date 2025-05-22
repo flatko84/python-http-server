@@ -5,6 +5,7 @@ import gzip
 # could be a dataclass in a real-world app
 class Request:
     def __init__(self, data):
+        print(data)
         self.head, self.body = data.split("\r\n\r\n")
         head_parsed = self.head.split("\r\n")
         self.method, self.route, self.protocol = head_parsed[0].split(" ")
@@ -16,16 +17,13 @@ class Request:
                 self.headers[header_row_split[0]] = header_row_split[1]
 
     def __repr__(self):
-        return f"(method='{self.method}' route='{self.route}' protocol='{self.protocol}' headers='{"".join([f"{header}: {value}" for header, value in self.headers.items()])}' body='{self.body}')"
+        return f"{self.__class__.__name__}(method='{self.method}' route='{self.route}' protocol='{self.protocol}' headers='{"".join([f"{header}: {value}" for header, value in self.headers.items()])}' body='{self.body}')"
 
 class Response:
     def __init__(self, body = '', status = "200 OK"):
         self.headers = {"Content-Type": 'text/plain'}
         self.body = body
         self.status = status
-
-    def add_header(self, header, content):
-        self.headers[header] = content
 
     def get_header(self, header):
         if header not in self.headers.keys():
@@ -40,8 +38,11 @@ class Response:
     
     @property
     def prepare(self):
-        headers_string = " ".join([f"{header}: {content}\r\n" for header, content in self.full_headers.items()])
+        headers_string = "".join([f"{header}: {content}\r\n" for header, content in self.full_headers.items()])
         return f"HTTP/1.1 {self.status}\r\n{headers_string}\r\n{self.body}"
+    
+    def __repr__(self):
+        return f"{self.__class__.__name__}(headers='{self.headers}', body='{self.body}', status='{self.status}')"
 
 
 class HttpServer:
@@ -69,7 +70,7 @@ class HttpServer:
             with open(f"storage/{request.props['filename']}") as file:
                 body = file.read()
             response = Response(body=body)
-            response.add_header("Content-Type", "application/octet-stream")
+            response.headers["Content-Type"] = "application/octet-stream"
             return response
         except:
             return Response(status="404 Not Found")
@@ -119,18 +120,28 @@ class HttpServer:
 # to do - split and eventually decouple web app from server
     def serve(self, socket_object, ret_address):
         with socket_object:
-            request_data = socket_object.recv(1024).decode()
-            request = Request(request_data)
-            print(request)
-            response = self.router(request)
-            # to do - implement middleware
-            try:
-                compression_header, request.body = self.compress(request.headers["Accept-Encoding"], request.body)
-                if compression_header:
-                    response.add_header("Content-Encoding", compression_header)
-            except:
-                print("No compression used.")
-            socket_object.sendall(response.prepare.encode())
+            buffer = b""
+            while True:
+                request_data = socket_object.recv(1024)
+                buffer += request_data
+                if len(request_data) == 0:
+                    break
+                if '\r\n\r\n' not in buffer.decode():
+                    continue
+                request = Request(buffer.decode())
+                response = self.router(request)
+                # to do - implement middleware
+                try:
+                    compression_header, request.body = self.compress(request.headers["Accept-Encoding"], request.body)
+                    if compression_header:
+                        response.headers["Content-Encoding"] = compression_header
+                except:
+                    print("No compression used.")
+                if 'Connection' in request.headers.keys() and request.headers["Connection"].lower() == 'close':
+                    response.headers["Connection"] = "close"
+                socket_object.sendall(response.prepare.encode())
+                buffer = b""
+                
 
 # to do - must be a separate file
     def main(self, *args):
