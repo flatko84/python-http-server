@@ -1,6 +1,6 @@
 import socket
 from threading import Thread
-from connection import Connection
+from webapp.connection import Connection
 
 class HttpServer:
     def main(self, *args):

@@ -21,10 +21,13 @@ class Router:
                 return False
         return props_dict
         
-    def router(self):
-        for route, endpoint in routes(self.request)[self.request.method].items():
+    def route(self):
+        for route, endpoint in routes[self.request.method].items():
             props = self.path_match(self.request.route, route)
             if type(props) == dict:
                 self.request.props = props
+                if type(endpoint) == tuple:
+                    cls, method_name = endpoint
+                    return getattr(cls(self.request), method_name)()
                 return endpoint(self.request)
         return Response(status="404 Not Found")

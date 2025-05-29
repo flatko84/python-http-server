@@ -21,19 +21,24 @@ class Connection:
     def connect(self, socket_object, ret_address):
             with socket_object:
                 buffer = b""
+                hooks = Hooks()
                 while True:
-                    request_data = socket_object.recv(1024)
-                    buffer += request_data
-                    if len(request_data) == 0:
+                    try:
+                        received_data = socket_object.recv(1024)
+                        buffer += received_data
+                    except:
+                        print("Error reading request.")
+                    if len(received_data) == 0:
                         break
-                    if '\r\n\r\n' not in buffer.decode():
+                    request_data = buffer.decode()
+                    if '\r\n\r\n' not in request_data:
                         continue
-                    request = self.build_request(buffer.decode())
-                    request = Hooks().receive(request)
-                    response = Router(request).router()
-                    response = Hooks().send(request, response)
+                    request = self.build_request(request_data)
+                    request = hooks.receive(request)
+                    response = Router(request).route()
+                    response = hooks.send(request, response)
                     if 'Connection' in request.headers.keys() and request.headers["Connection"].lower() == 'close':
                         response.headers["Connection"] = "close"
-                    socket_object.sendall(response.prepare.encode())
+                    socket_object.sendall(response.text.encode())
                     buffer = b""
                 
