@@ -1,5 +1,4 @@
-from hooks.receive import *
-from hooks.send import *
+from hooks.send import compression
 
 hooks = {
     "receive": [

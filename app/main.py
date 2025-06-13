@@ -3,7 +3,8 @@ from threading import Thread
 from webapp.connection import Connection
 
 class HttpServer:
-    def main(self, *args):
+    def main(self, *args) -> None:
+        """The main entry point of the application."""
         print("Server started.")
         server = socket.create_server(("localhost", 4221), reuse_port=True)
         connection = Connection()

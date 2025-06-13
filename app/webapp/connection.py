@@ -4,7 +4,8 @@ from hooks.hooks import Hooks
 
 class Connection:
 
-    def build_request(self, data):
+    def build_request(self, data: str) -> Request:
+        """Create an instance of the Request class."""
         print(data)
         head, body = data.split("\r\n\r\n")
         head_parsed = head.split("\r\n")
@@ -18,7 +19,8 @@ class Connection:
         return Request(method=method, route=route, protocol=protocol, props=props, headers=headers, body=body)
 
 
-    def connect(self, socket_object, ret_address):
+    def connect(self, socket_object, ret_address) -> None:
+            """Handle each connection."""
             with socket_object:
                 buffer = b""
                 hooks = Hooks()
@@ -39,6 +41,6 @@ class Connection:
                     response = hooks.send(request, response)
                     if 'Connection' in request.headers.keys() and request.headers["Connection"].lower() == 'close':
                         response.headers["Connection"] = "close"
-                    socket_object.sendall(response.text.encode())
+                    socket_object.sendall(str(response).encode())
                     buffer = b""
                 

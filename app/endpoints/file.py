@@ -2,7 +2,8 @@ from endpoints.endpoint import Endpoint
 from lib.response import Response
 
 class File(Endpoint):
-    def get_file(self):
+    def get_file(self) -> Response:
+        """Get a file by path."""
         try:
             # to do - set this dynamically from the shell script
             with open(f"../storage/{self.request.props['filename']}") as file:
@@ -13,7 +14,8 @@ class File(Endpoint):
         except:
             return Response(status="404 Not Found")
         
-    def create_file(self):
+    def create_file(self) -> Response:
+        """Create a file by path and content."""
         with open(f"../storage/{self.request.props['filename']}", "w") as file:
             file.write(self.request.body)
         return Response(status="201 Created")
