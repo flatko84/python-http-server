@@ -6,7 +6,7 @@ class File(Endpoint):
         """Get a file by path."""
         try:
             # to do - set this dynamically from the shell script
-            with open(f"../storage/{self.request.props['filename']}") as file:
+            with open(f"./storage/{self.request.props['filename']}") as file:
                 body = file.read()
             response = Response(body=body)
             response.headers["Content-Type"] = "application/octet-stream"
@@ -16,6 +16,6 @@ class File(Endpoint):
         
     def create_file(self) -> Response:
         """Create a file by path and content."""
-        with open(f"../storage/{self.request.props['filename']}", "w") as file:
+        with open(f"./storage/{self.request.props['filename']}", "w") as file:
             file.write(self.request.body)
         return Response(status="201 Created")
